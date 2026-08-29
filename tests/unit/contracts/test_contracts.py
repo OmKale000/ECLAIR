@@ -13,6 +13,7 @@ from eclair import (
     ModuleError,
     load_config,
 )
+from eclair.config import LLMProviderConfig
 from eclair import __version__ as pkg_version
 from eclair.contracts import (
     Claim,
@@ -219,6 +220,90 @@ def test_config_is_frozen_and_forbids_extra() -> None:
         cfg.environment = "changed"  # type: ignore[misc]
     with pytest.raises(ValidationError):
         EclairConfig(unexpected="x")
+
+
+# --- LLM provider config (generic sub-model) -------------------------------
+
+
+def test_default_config_exposes_llm_submodel_with_safe_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for var in (
+        "ECLAIR_LLM_ACTIVE_PROVIDER",
+        "ECLAIR_LLM_TIMEOUT_SECONDS",
+        "ECLAIR_LLM_RETRIES",
+        "OLLAMA_BASE_URL",
+        "OLLAMA_MODEL",
+        "GEMINI_API_KEY",
+        "GROQ_API_KEY",
+        "OPENROUTER_API_KEY",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+    cfg = load_config()
+    assert isinstance(cfg.llm, LLMProviderConfig)
+    # Zero-config EclairConfig() also carries the default sub-model.
+    assert isinstance(EclairConfig().llm, LLMProviderConfig)
+    assert cfg.llm.active_provider == "ollama"
+    assert cfg.llm.ollama_base_url == "http://localhost:11434"
+    assert cfg.llm.ollama_model == "llama3"
+    assert cfg.llm.timeout_seconds == 30.0
+    assert cfg.llm.retries == 2
+    # Optional providers unconfigured by default.
+    assert cfg.llm.gemini_api_key is None
+    assert cfg.llm.groq_api_key is None
+    assert cfg.llm.openrouter_api_key is None
+
+
+def test_load_config_reads_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ECLAIR_LLM_ACTIVE_PROVIDER", "gemini")
+    monkeypatch.setenv("ECLAIR_LLM_TIMEOUT_SECONDS", "12.5")
+    monkeypatch.setenv("ECLAIR_LLM_RETRIES", "5")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.local:11434")
+    monkeypatch.setenv("OLLAMA_MODEL", "mistral")
+    monkeypatch.setenv("GEMINI_API_KEY", "placeholder-key")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+    cfg = load_config()
+    assert cfg.llm.active_provider == "gemini"
+    assert cfg.llm.timeout_seconds == 12.5
+    assert cfg.llm.retries == 5
+    assert cfg.llm.ollama_base_url == "http://ollama.local:11434"
+    assert cfg.llm.ollama_model == "mistral"
+    assert cfg.llm.gemini_api_key == "placeholder-key"
+    assert cfg.llm.gemini_model == "gemini-1.5-flash"
+
+
+def test_load_config_invalid_timeout_raises_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ECLAIR_LLM_TIMEOUT_SECONDS", "not-a-number")
+    with pytest.raises(ConfigurationError):
+        load_config()
+
+
+def test_load_config_nonpositive_timeout_raises_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ECLAIR_LLM_TIMEOUT_SECONDS", "0")
+    with pytest.raises(ConfigurationError):
+        load_config()
+
+
+def test_load_config_invalid_retries_raises_configuration_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ECLAIR_LLM_RETRIES", "-1")
+    with pytest.raises(ConfigurationError):
+        load_config()
+
+
+def test_llm_config_is_frozen_and_forbids_extra() -> None:
+    llm = LLMProviderConfig()
+    with pytest.raises(ValidationError):
+        llm.active_provider = "changed"  # type: ignore[misc]
+    with pytest.raises(ValidationError):
+        LLMProviderConfig(unexpected="x")
 
 
 # --- Exceptions ------------------------------------------------------------
