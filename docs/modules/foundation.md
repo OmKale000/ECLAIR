@@ -93,3 +93,54 @@ data conversions.
 - Contracts import cleanly and validate sample data.
 - Enum values for verification/risk/decision match the Spec semantics.
 - `tests/unit/contracts/` pass; config and exceptions are importable; no invented behavior.
+
+## Sample input / output
+
+Constructing and serializing the aggregate contract (illustrates the frozen shapes):
+
+```python
+from eclair.contracts import (
+    Claim, ConfidenceResult, DecisionAction, DecisionResult,
+    EclairResult, Evidence, RiskResult, VerificationResult, VerificationStatus,
+)
+
+# Sample input: pipeline stage outputs assembled by the engine.
+result = EclairResult(
+    query_id="q1",
+    answer="Refunds are issued within 30 days.",
+    claims=[Claim(claim_id="c1", text="Refunds are issued within 30 days.")],
+    evidence=[Evidence(evidence_id="e1", text="Policy: refunds within 30 days.")],
+    verifications=[
+        VerificationResult(
+            claim_id="c1", status=VerificationStatus.SUPPORTED, evidence_ids=["e1"]
+        )
+    ],
+    confidence=ConfidenceResult(raw_confidence=0.80, calibrated_ecs=0.75),
+    risk=RiskResult(risk_level="low"),
+    decision=DecisionResult(action=DecisionAction.RETURN),
+)
+
+# Sample output: validated, serializable dict keyed by query_id.
+print(result.model_dump())
+```
+
+```python
+{
+    "query_id": "q1",
+    "answer": "Refunds are issued within 30 days.",
+    "claims": [{"claim_id": "c1", "text": "Refunds are issued within 30 days."}],
+    "evidence": [{"evidence_id": "e1", "text": "Policy: refunds within 30 days.",
+                  "source": None, "relevance_score": None}],
+    "verifications": [{"claim_id": "c1", "status": "SUPPORTED", "evidence_ids": ["e1"]}],
+    "confidence": {"raw_confidence": 0.8, "calibrated_ecs": 0.75},
+    "risk": {"risk_level": "low", "risk_score": None},
+    "decision": {"action": "RETURN", "reason": None},
+}
+```
+
+## Implementation status
+Implemented on branch `M01-Foundation`. Contracts, enums, interfaces, `config.py`,
+`exceptions.py`, `version.py`, and engine scaffolding shells are in place. The engine
+scaffolding (`Orchestrator`, `Pipeline`, `EclairEngine`) intentionally raises
+`NotImplementedError` — pipeline wiring is owned by the integration phase (Spec §4.2), not M01.
+Unit tests in `tests/unit/contracts/` pass (28 tests) and Ruff lint is clean.
