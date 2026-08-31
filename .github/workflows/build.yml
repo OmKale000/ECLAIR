@@ -1,0 +1,29 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+# Builds the ECLAIR Python package to keep builds reproducible (Spec §M18).
+# The Docker image build (deployment/Dockerfile.*) is delivered by M18; those
+# Dockerfiles are still placeholders on the foundation branches, so this
+# workflow verifies the package build that exists today.
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Build the package
+        run: uv build

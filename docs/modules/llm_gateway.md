@@ -70,6 +70,67 @@ module folder.
 ## Expected outcome (Spec §M02)
 Other modules call `llm.generate(...)` without caring which provider is active.
 
+## Module surface (M02-owned)
+`LLMRequest` and `LLMResponse` are owned by M02 (M01's `LLMProvider` Protocol leaves those types as
+`Any` for M02 to refine within its boundary). They are Pydantic v2 models defined in
+`src/eclair/llm/base.py`:
+
+- **`LLMRequest`** — `prompt` (required), `model` (optional override → model selection),
+  `temperature` (0.0–2.0, optional), `max_tokens` (>0, optional), `json_mode` (bool, structured JSON).
+- **`LLMResponse`** — `text`, `model`, `provider`, `structured` (parsed JSON when `json_mode` produced
+  valid JSON, else `None`).
+
+Public exports (`eclair.llm`): `LLMRequest`, `LLMResponse`, `BaseHTTPProvider`, `OllamaProvider`,
+`GeminiProvider`, `GroqProvider`, `OpenRouterProvider`, `build_provider`, `SUPPORTED_PROVIDERS`,
+`LLMRouter`, `FALLBACK_PROVIDER`.
+
+## Usage
+Callers build a router from the shared M01 config and call `generate(...)`; they never touch
+providers directly:
+
+```python
+from eclair.config import load_config
+from eclair.llm import LLMRequest, LLMRouter
+
+router = LLMRouter(load_config().llm)
+response = router.generate(LLMRequest(prompt="Summarize the refund policy."))
+print(response.text)
+```
+
+The router routes to `config.active_provider`, retries up to `config.retries` extra attempts, and
+falls back to Ollama (the permanent zero-cost fallback, Spec §4.11) if the active provider fails —
+unless Ollama is already the active provider. If both fail it raises `ModuleError`
+(`code="llm_all_providers_failed"`).
+
+## Sample input / output
+**Sample input** — an `LLMRequest`:
+
+```json
+{
+  "prompt": "Return the max refund window in days as JSON.",
+  "model": null,
+  "temperature": 0.0,
+  "max_tokens": 64,
+  "json_mode": true
+}
+```
+
+**Sample output** — an `LLMResponse` (Ollama active, provider returned `{"refund_window_days": 30}`):
+
+```json
+{
+  "text": "{\"refund_window_days\": 30}",
+  "model": "llama3",
+  "provider": "ollama",
+  "structured": {"refund_window_days": 30}
+}
+```
+
+## Error codes (shared `ModuleError`)
+`llm_invalid_request`, `llm_timeout`, `llm_http_error`, `llm_request_failed`, `llm_bad_response`,
+`llm_unknown_provider`, `llm_provider_unconfigured`, `llm_all_providers_failed`. No new error format
+is introduced; all use M01's `eclair.exceptions.ModuleError`.
+
 ## Verification before complete (Spec §4.8)
 - All providers implement the same `LLMProvider` interface.
 - Fallback and retry behavior works; Ollama is the guaranteed fallback.
