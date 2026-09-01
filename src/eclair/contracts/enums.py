@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from enum import Enum
 
-__all__ = ["VerificationStatus", "DecisionAction", "ConsensusLevel"]
+__all__ = ["VerificationStatus", "DecisionAction", "ConsensusLevel", "ClaimType"]
 
 
 class VerificationStatus(str, Enum):
@@ -43,3 +43,18 @@ class ConsensusLevel(str, Enum):
 
     FULL = "FULL"
     PARTIAL = "PARTIAL"
+
+
+class ClaimType(str, Enum):
+    """Type of an extracted claim, assigned by M03 Claim Extraction (Spec sec.M03).
+
+    Frozen per SHARED_CONTRACTS_REFERENCE.md sec.2. The Spec does not enumerate
+    claim-type members, so M01 fixes them once here and they are frozen for all
+    modules. No module may add, rename, or remove members.
+    """
+
+    FACTUAL = "FACTUAL"
+    NUMERIC = "NUMERIC"
+    TEMPORAL = "TEMPORAL"
+    ENTITY = "ENTITY"
+    OTHER = "OTHER"

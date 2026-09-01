@@ -53,6 +53,16 @@ BLOCK_ACTION
 **Consensus level** (Spec §M09): full or partial consensus + a numeric agreement score.
 (Exact enum spelling for full/partial is defined once by M01/M09 and then frozen.)
 
+**Claim type** (Spec §M03; members not enumerated by the Spec, fixed once by M01 and frozen for
+all modules):
+```
+FACTUAL
+NUMERIC
+TEMPORAL
+ENTITY
+OTHER
+```
+
 ## 3. Frozen module interfaces (Spec §4.1, §4.3)
 
 ```
