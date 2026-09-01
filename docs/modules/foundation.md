@@ -53,10 +53,16 @@ tests/unit/contracts/
 | `DecisionResult` | `contracts/decision.py` | M13 |
 | `EclairResult` | `contracts/result.py` | engine |
 
+The `Claim` contract carries `claim_id`, `text`, and `claim_type: ClaimType` (default
+`ClaimType.OTHER`; M03 sets it explicitly). The field is optional/defaulted so existing
+`Claim(text=...)` construction remains valid.
+
 ## Frozen enums defined here (SHARED_CONTRACTS_REFERENCE §2)
 - Verification status: `SUPPORTED`, `CONTRADICTED`, `UNKNOWN`.
 - Decision actions: `RETURN`, `VERIFY_MORE`, `REGENERATE`, `ABSTAIN`, `HUMAN_REVIEW`, `BLOCK_ACTION`.
 - Consensus level: full or partial consensus + numeric agreement score.
+- Claim type (`ClaimType`, assigned by M03): `FACTUAL`, `NUMERIC`, `TEMPORAL`, `ENTITY`, `OTHER`.
+  Members not enumerated by the Spec; fixed once by M01 and frozen for all modules.
 
 ## Interfaces (Spec §4.3)
 Define the stable Protocols the whole system builds against:

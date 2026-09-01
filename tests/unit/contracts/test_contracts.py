@@ -18,6 +18,7 @@ from eclair import __version__ as pkg_version
 from eclair.contracts import (
     Claim,
     ClaimExtractor,
+    ClaimType,
     ConfidenceEstimator,
     ConfidenceResult,
     ConsensusLevel,
@@ -70,6 +71,17 @@ def test_consensus_level_members_frozen() -> None:
     assert {c.value for c in ConsensusLevel} == {"FULL", "PARTIAL"}
 
 
+def test_claim_type_members_frozen() -> None:
+    # Exact set and values frozen per SHARED_CONTRACTS_REFERENCE.md §2.
+    assert [c.value for c in ClaimType] == [
+        "FACTUAL",
+        "NUMERIC",
+        "TEMPORAL",
+        "ENTITY",
+        "OTHER",
+    ]
+
+
 # --- Query -----------------------------------------------------------------
 
 
@@ -96,6 +108,22 @@ def test_claim_valid() -> None:
     c = Claim(text="Refunds are issued within 30 days.")
     assert c.text
     assert c.claim_id
+
+
+def test_claim_type_defaults_to_other() -> None:
+    # Backward-compatible: constructing with only text yields OTHER.
+    c = Claim(text="Refunds are issued within 30 days.")
+    assert c.claim_type is ClaimType.OTHER
+
+
+def test_claim_retains_explicit_type() -> None:
+    c = Claim(text="Refund is 30 dollars.", claim_type=ClaimType.NUMERIC)
+    assert c.claim_type is ClaimType.NUMERIC
+
+
+def test_claim_forbids_extra_fields() -> None:
+    with pytest.raises(ValidationError):
+        Claim(text="x", unexpected="y")
 
 
 def test_evidence_optional_annotations() -> None:

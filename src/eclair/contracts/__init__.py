@@ -9,7 +9,7 @@ from __future__ import annotations
 from eclair.contracts.claim import Claim
 from eclair.contracts.confidence import ConfidenceResult
 from eclair.contracts.decision import DecisionResult
-from eclair.contracts.enums import ConsensusLevel, DecisionAction, VerificationStatus
+from eclair.contracts.enums import ClaimType, ConsensusLevel, DecisionAction, VerificationStatus
 from eclair.contracts.evidence import Evidence
 from eclair.contracts.interfaces import (
     ClaimExtractor,
@@ -38,6 +38,7 @@ __all__ = [
     "VerificationStatus",
     "DecisionAction",
     "ConsensusLevel",
+    "ClaimType",
     # Interfaces
     "LLMProvider",
     "ClaimExtractor",

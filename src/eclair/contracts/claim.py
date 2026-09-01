@@ -11,6 +11,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from eclair.contracts.enums import ClaimType
+
 __all__ = ["Claim"]
 
 
@@ -27,4 +29,11 @@ class Claim(BaseModel):
         ...,
         min_length=1,
         description="The atomic factual claim text.",
+    )
+    claim_type: ClaimType = Field(
+        default=ClaimType.OTHER,
+        description=(
+            "Type of the claim assigned by M03 Claim Extraction. Defaults to "
+            "ClaimType.OTHER; M03 sets it explicitly."
+        ),
     )
