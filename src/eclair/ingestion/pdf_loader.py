@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from eclair.exceptions import ModuleError
 from eclair.ingestion.metadata import Document, DocumentMetadata, extract_file_metadata

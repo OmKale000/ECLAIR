@@ -10,7 +10,7 @@ from pathlib import Path
 
 from eclair.exceptions import ModuleError
 from eclair.ingestion.markdown_loader import MarkdownLoader
-from eclair.ingestion.metadata import Document, DocumentMetadata
+from eclair.ingestion.metadata import Document
 from eclair.ingestion.pdf_loader import PDFLoader
 from eclair.ingestion.text_loader import TextLoader
 
