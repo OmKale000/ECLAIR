@@ -3,64 +3,133 @@
 > Module documentation (Spec §4.8). Derived only from the Spec (§M05, §4.5, §4.7) and the repo.
 > Authoritative rules: `rules/M05_rag_evidence_retrieval.md`, `rules/COMMON_RULES.md`.
 
-## Identity
+## 1. Identity
 - **ID:** M05
 - **Name:** RAG / Evidence Retrieval
 - **Folder:** `src/eclair/rag/`
 - **Tests:** `tests/unit/rag/`
 
-## Purpose (Spec §M05)
-Retrieve evidence relevant to each claim.
+## 2. Purpose (Spec §M05)
+Retrieve candidate evidence relevant to each extracted atomic claim from the controlled knowledge base.
 
-## Responsibility
-Chunk, embed, index, retrieve and optionally rerank relevant evidence over the controlled knowledge
-base.
+## 3. Module Responsibilities
+- Chunk standardized documents produced by M04 Document Ingestion into searchable passage chunks.
+- Generate numerical dense embeddings using SentenceTransformers (`sentence-transformers/all-MiniLM-L6-v2`) for document chunks and queries with matching vector dimensions.
+- Build and maintain FAISS vector indices mapping vector positions directly to chunks and parent document metadata.
+- Provide the frozen M01 retrieval interface: `Retriever.search(query: str, top_k: int = 5) -> list[Evidence]` (and alias `retrieve(query, top_k)`).
+- Return candidate evidence ranked in descending order of similarity score.
+- Support optional candidate reranking (`Reranker`, `SimilarityReranker`, `NoOpReranker`) without altering core contract fields.
+- Gracefully handle empty knowledge bases and zero-evidence queries by returning `[]`.
 
-## Non-responsibility
-- Does NOT decide whether evidence supports a claim — **RAG is not verification (Spec §4.5)**.
-- Does NOT score evidence quality/conflict (M06) or verify (M07).
+## 4. Non-Responsibilities
+- Does NOT ingest raw document files (responsibility of M04).
+- Does NOT judge evidence quality, credibility, or conflict (responsibility of M06).
+- Does NOT verify claims or determine truth values — **RAG is not verification (Spec §4.5)**.
+- Does NOT calculate calibrated ECS or final confidence (responsibility of M10 / M11).
+- Does NOT make decision actions (responsibility of M13).
+- Does NOT fabricate evidence when search yields no matches.
 
-## Files (Spec §M05)
+## 5. Architecture & Components
+```text
+src/eclair/rag/
+  ├── models.py       # TextChunk and ScoredChunk data models
+  ├── chunker.py      # DocumentChunker splitting M04 documents into passage chunks
+  ├── embeddings.py   # EmbeddingGenerator and Encoder protocol
+  ├── index.py        # VectorIndex and FAISSIndex with NumPy fallback
+  ├── reranker.py     # Reranker protocol, NoOpReranker, SimilarityReranker
+  ├── retriever.py    # Retriever orchestrator implementing M01 Retriever protocol
+  └── __init__.py     # Module public exports
 ```
-src/eclair/rag/  chunker.py  embeddings.py  index.py  retriever.py  reranker.py  models.py
+
+### Component Details
+1. **`DocumentChunker` (`chunker.py`)**:
+   - Takes M04 `Document` / `StandardizedDocument` objects.
+   - Splits text into passage chunks honoring paragraph breaks (`\n\n`), sentence boundaries, and character bounds (`chunk_size=500`, `chunk_overlap=50`).
+   - Preserves `doc_id`, `source`, `filename`, `created_date`, `modified_date`, `page_number`, and `document_version`.
+2. **`EmbeddingGenerator` (`embeddings.py`)**:
+   - Encodes document chunks and queries into normalized float32 embeddings.
+   - Uses `all-MiniLM-L6-v2` by default with injectable `Encoder` for offline unit testing.
+   - Ensures identical embedding dimension between queries and indexed passages.
+3. **`VectorIndex` / `FAISSIndex` (`index.py`)**:
+   - Maintains a 1-to-1 index mapping from vector IDs to `TextChunk` objects.
+   - Performs inner product (cosine similarity) search.
+   - Supports disk serialization via `save()` and `load()`.
+4. **`Reranker` (`reranker.py`)**:
+   - `NoOpReranker`: Pass-through default.
+   - `SimilarityReranker`: Lexical/hybrid candidate re-scoring and re-ordering.
+5. **`Retriever` (`retriever.py`)**:
+   - Conforms to the frozen M01 `Retriever` protocol (`search(query, top_k=5) -> list[Evidence]`).
+   - Converts scored chunks into standard M01 `Evidence` instances with `relevance_score` in `[0.0, 1.0]`.
+
+## 6. M04 → M05 → M06 / M07 Integration Flow
+```text
+M04 Standardized Documents
+           ↓
+M05 DocumentChunker
+           ↓
+M05 EmbeddingGenerator
+           ↓
+M05 FAISS VectorIndex
+           ↓  ← [Query / Claim from M03 / Engine]
+M05 Retriever.search(query, top_k)
+           ↓
+M05 Optional Reranking
+           ↓
+M01 ranked list[Evidence]
+           ↓
+M06 Evidence Quality → M07 Claim Verification → Engine
 ```
 
-## Technology (Spec §M05)
-sentence-transformers, FAISS, NumPy.
+## 7. Reliability Boundary & Semantics (Spec §4.5)
+- **Retrieved evidence ≠ proof:** Finding a related document does not mean the claim is factual or verified.
+- **Similarity score ≠ truth:** High cosine similarity only denotes semantic proximity, not truth or agreement.
+- **No evidence → `[]`:** Absence of matching documents produces an empty list `[]`, which verification (M07) maps to `UNKNOWN` (never `SUPPORTED`, Spec §4.9).
+- M05 outputs unverified candidate evidence only.
 
-## Method (Spec §M05)
-Chunking → embeddings → FAISS similarity search → Top-K retrieval → optional reranking.
+## 8. Sample Input and Output
 
-## Required functionality (Spec §M05)
-- `retrieve(query, top_k=5)` — interface: `Retriever.search(query, top_k=5) -> list[Evidence]`
-  (Spec §4.1, §4.3).
-- Return ranked evidence.
-- Support controlled knowledge-base retrieval.
-- Optionally rerank retrieved candidates.
+### Input: M04 Standardized Document
+```python
+from eclair.ingestion.metadata import Document, DocumentMetadata
 
-## Inputs / Outputs
-- **Input:** a claim/query (`str`), typically per-claim from M03, plus indexed documents from M04.
-- **Output:** `list[Evidence]` (M01 contract), ranked candidate evidence.
-- **Consumers:** M06 Evidence Quality (scores it), M07 Verification (verifies against it), engine.
+doc = Document(
+    doc_id="doc-refund-001",
+    text=(
+        "# Refund Policy\n\n"
+        "Customers may request a full refund within 30 calendar days of initial purchase.\n\n"
+        "Refunds are credited back to the original payment method within 5-7 business days."
+    ),
+    metadata=DocumentMetadata(
+        filename="refund_policy.md",
+        source="data/knowledge_base/refund_policy/refund_policy.md",
+        created_date="2026-01-01T00:00:00Z",
+        modified_date="2026-01-02T00:00:00Z",
+        page_number=1,
+        document_version="1.0",
+    ),
+)
+```
 
-## Dependencies
-- Internal: M01 contracts (`Evidence`); M04 standardized documents.
-- External: FAISS, sentence-transformers, NumPy.
+### Execution: Indexing & Retrieval
+```python
+from eclair.rag import Retriever
 
-## Reliability semantic (Spec §4.5)
-"I found this document" ≠ "this document supports the claim." Retrieval produces *candidate*
-evidence only; verification (M07) is a separate explicit step. RAG retrieval itself is never treated
-as proof.
+retriever = Retriever()
+retriever.index_documents([doc])
 
-## Error handling
-Use M01 exceptions. Returning zero evidence is valid; do not fabricate evidence.
+# Query derived from an atomic claim extracted by M03
+query = "Refunds can be requested within 30 days"
+results = retriever.search(query, top_k=1)
+```
 
-## Do not change
-M01 `Evidence` contract; M04 document format; any other module folder.
-
-## Expected outcome (Spec §M05)
-For each claim, ECLAIR returns ranked candidate evidence. RAG retrieval itself is not treated as proof.
-
-## Verification before complete (Spec §4.8)
-- `retrieve(query, top_k=5)` returns ranked `Evidence` from the controlled KB; optional reranking works.
-- `tests/unit/rag/` pass; sample input/output provided.
+### Output: M01 Evidence Contract
+```python
+[
+    Evidence(
+        evidence_id="a1b2c3d4e5f67890",
+        text="Customers may request a full refund within 30 calendar days of initial purchase.",
+        source="data/knowledge_base/refund_policy/refund_policy.md",
+        relevance_score=0.912,
+    )
+]
+```
