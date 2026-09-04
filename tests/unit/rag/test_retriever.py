@@ -6,6 +6,8 @@ and M01 Evidence contract compliance.
 
 from __future__ import annotations
 
+import zlib
+
 import pytest
 
 from eclair.contracts.evidence import Evidence
@@ -21,7 +23,7 @@ from eclair.rag.retriever import DEFAULT_TOP_K, Retriever
 class DeterministicWordEncoder:
     """Deterministic offline encoder for retriever testing."""
 
-    def __init__(self, dim: int = 16) -> None:
+    def __init__(self, dim: int = 64) -> None:
         self.dim = dim
 
     def encode(self, sentences: list[str]) -> list[list[float]]:
@@ -29,7 +31,7 @@ class DeterministicWordEncoder:
         for s in sentences:
             v = [0.0] * self.dim
             for w in s.lower().replace(".", "").replace(",", "").split():
-                idx = abs(hash(w)) % self.dim
+                idx = zlib.crc32(w.encode("utf-8")) % self.dim
                 v[idx] += 1.0
             norm = sum(x * x for x in v) ** 0.5
             if norm > 0:
@@ -52,10 +54,10 @@ def _make_doc(text: str, doc_id: str, source: str = "kb/refund.md") -> Document:
     return Document(doc_id=doc_id, text=text, metadata=meta)
 
 
-def _build_test_retriever() -> Retriever:
-    encoder = DeterministicWordEncoder(dim=16)
+def _build_test_retriever(dim: int = 64) -> Retriever:
+    encoder = DeterministicWordEncoder(dim=dim)
     embedder = EmbeddingGenerator(encoder=encoder)
-    index = VectorIndex(dimension=16)
+    index = VectorIndex(dimension=dim)
     return Retriever(index=index, embedder=embedder)
 
 
@@ -163,9 +165,9 @@ def test_ranking_order_descending() -> None:
 
 
 def test_retriever_with_reranker() -> None:
-    encoder = DeterministicWordEncoder(dim=16)
+    encoder = DeterministicWordEncoder(dim=64)
     embedder = EmbeddingGenerator(encoder=encoder)
-    index = VectorIndex(dimension=16)
+    index = VectorIndex(dimension=64)
     reranker = SimilarityReranker()
     retriever = Retriever(index=index, embedder=embedder, reranker=reranker)
 
