@@ -6,6 +6,8 @@ and quality-annotated by M06 without contract drift.
 
 from __future__ import annotations
 
+import zlib
+
 from eclair.contracts.evidence import Evidence
 from eclair.evidence.models import EvidenceQualityReport
 from eclair.evidence.scorer import EvidenceScorer
@@ -18,7 +20,7 @@ from eclair.rag.retriever import Retriever
 class DeterministicWordEncoder:
     """Deterministic offline word encoder for fast integration testing."""
 
-    def __init__(self, dim: int = 16) -> None:
+    def __init__(self, dim: int = 64) -> None:
         self.dim = dim
 
     def encode(self, sentences: list[str]) -> list[list[float]]:
@@ -26,7 +28,7 @@ class DeterministicWordEncoder:
         for s in sentences:
             v = [0.0] * self.dim
             for w in s.lower().replace(".", "").replace(",", "").split():
-                idx = abs(hash(w)) % self.dim
+                idx = zlib.crc32(w.encode("utf-8")) % self.dim
                 v[idx] += 1.0
             norm = sum(x * x for x in v) ** 0.5
             if norm > 0:
@@ -56,9 +58,9 @@ def test_m05_retrieval_to_m06_quality_scoring_pipeline() -> None:
     )
 
     # 2. M05 RAG indexing and retrieval
-    encoder = DeterministicWordEncoder(dim=16)
+    encoder = DeterministicWordEncoder(dim=64)
     embedder = EmbeddingGenerator(encoder=encoder)
-    index = VectorIndex(dimension=16)
+    index = VectorIndex(dimension=64)
     retriever = Retriever(index=index, embedder=embedder)
 
     retriever.index_documents([doc])
