@@ -9,6 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+import zlib
+
 from eclair.exceptions import ModuleError
 from eclair.ingestion.metadata import DocumentMetadata
 from eclair.rag.embeddings import EmbeddingGenerator
@@ -27,7 +29,7 @@ class DeterministicFakeEncoder:
             # Deterministic hash-based vector
             vec = [0.0] * self.dim
             for word in s.lower().split():
-                idx = hash(word) % self.dim
+                idx = zlib.crc32(word.encode("utf-8")) % self.dim
                 vec[idx] += 1.0
             norm = sum(x * x for x in vec) ** 0.5
             if norm > 0:

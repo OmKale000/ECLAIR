@@ -8,6 +8,7 @@ M04 StandardizedDocument / DocumentLoader -> M05 Chunker -> M05 Embeddings
 from __future__ import annotations
 
 import tempfile
+import zlib
 from pathlib import Path
 
 from eclair.contracts.evidence import Evidence
@@ -21,9 +22,9 @@ from eclair.rag import (
 
 
 class PipelineDeterministicEncoder:
-    """Offline encoder for integration tests."""
+    """Offline deterministic encoder for integration tests."""
 
-    def __init__(self, dim: int = 16) -> None:
+    def __init__(self, dim: int = 64) -> None:
         self.dim = dim
 
     def encode(self, sentences: list[str]) -> list[list[float]]:
@@ -31,7 +32,7 @@ class PipelineDeterministicEncoder:
         for s in sentences:
             v = [0.0] * self.dim
             for word in s.lower().replace(".", "").replace(",", "").split():
-                idx = abs(hash(word)) % self.dim
+                idx = zlib.crc32(word.encode("utf-8")) % self.dim
                 v[idx] += 1.0
             norm = sum(x * x for x in v) ** 0.5
             if norm > 0:
@@ -73,9 +74,9 @@ def test_m04_to_m05_end_to_end_integration() -> None:
         assert docs_txt[0].metadata.filename == "terms.txt"
 
         # 2. Build M05 RAG Pipeline
-        encoder = PipelineDeterministicEncoder(dim=16)
+        encoder = PipelineDeterministicEncoder(dim=64)
         embedder = EmbeddingGenerator(encoder=encoder)
-        index = VectorIndex(dimension=16)
+        index = VectorIndex(dimension=64)
         chunker = DocumentChunker(chunk_size=150, chunk_overlap=20)
         retriever = Retriever(index=index, embedder=embedder, chunker=chunker)
 
@@ -121,7 +122,7 @@ def test_m04_loader_directory_to_m05_pipeline() -> None:
         documents = loader.load_directory(tmp_path)
         assert len(documents) == 2
 
-        encoder = PipelineDeterministicEncoder(dim=16)
+        encoder = PipelineDeterministicEncoder(dim=64)
         embedder = EmbeddingGenerator(encoder=encoder)
         retriever = Retriever(embedder=embedder)
 
