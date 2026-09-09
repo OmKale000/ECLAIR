@@ -204,7 +204,7 @@ ReflectionResult(
 
 ## 16. Verification Suite
 Unit tests located in `tests/unit/reflection/`:
-- `test_models.py`: Validates model schemas, configuration defaults, field constraints, and immutability.
+- `test_reflection_models.py`: Validates model schemas, configuration defaults, field constraints, and immutability.
 - `test_critic.py`: Validates detection of `CONTRADICTED` and `UNKNOWN` claims, prompt formatting, and preservation of `SUPPORTED` claims.
 - `test_rewriter.py`: Validates LLM prompt formation, parameter forwarding, error mapping, and blank response handling.
 - `test_stopping.py`: Validates trigger rules (low confidence, contradicted claims, ungrounded claims) and stopping conditions (`all_claims_supported`, `regeneration_unchanged`, `max_iterations_reached`).
