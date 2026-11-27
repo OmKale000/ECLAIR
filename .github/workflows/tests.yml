@@ -24,5 +24,8 @@ jobs:
       - name: Install project (with dev dependencies)
         run: uv pip install --system --editable ".[dev]"
 
+      - name: Confirm SQLAlchemy and Alembic can be imported
+        run: python -c "import sqlalchemy, alembic; print('SQLAlchemy and Alembic imports successful')"
+
       - name: Run pytest
         run: pytest
